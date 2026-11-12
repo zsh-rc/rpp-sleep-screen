@@ -3,7 +3,7 @@
 Generate a photo and weather dashboard on your computer and upload it to the
 reMarkable Paper Pro sleep screen.
 
-![Dashboard Preview](./example.png)
+![Weather dashboard](./assets/example.png)
 
 ## Features
 
