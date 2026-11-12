@@ -1,0 +1,63 @@
+name: Dashboard v2
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */2 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+      - name: Install dependencies and fonts
+        run: |
+          python -m pip install -r requirements.txt
+          sudo -n apt-get update
+          sudo -n apt-get install -y fonts-dejavu-core
+      - name: Test v1 and v2
+        run: |
+          python -m unittest discover -s tests -v
+          python -m unittest discover -s v2/tests -v
+      - name: Generate dashboard
+        env:
+          LATITUDE: ${{ vars.LATITUDE }}
+          LONGITUDE: ${{ vars.LONGITUDE }}
+          CITY_NAME: ${{ vars.CITY_NAME }}
+          CONTACT_INFO: ${{ secrets.CONTACT_INFO }}
+          ORIENTATION: ${{ vars.DASHBOARD_ORIENTATION || 'portrait' }}
+        run: python v2/generate.py --orientation "$ORIENTATION"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: v2/public
+
+  deploy:
+    needs: generate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy latest dashboard
+        id: deployment
+        uses: actions/deploy-pages@v4

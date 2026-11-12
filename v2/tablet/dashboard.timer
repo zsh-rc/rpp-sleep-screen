@@ -1,0 +1,12 @@
+[Unit]
+Description=Check for a new sleep screen while the tablet is running
+
+[Timer]
+OnBootSec=45s
+OnUnitInactiveSec=2min
+AccuracySec=5s
+WakeSystem=false
+Unit=rpp-dashboard-v2.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,9 @@
+[Unit]
+Description=Fetch the v2 reMarkable sleep screen
+After=network.target
+ConditionPathExists=/home/root/rpp-sleep-screen-v2/config.env
+
+[Service]
+Type=oneshot
+EnvironmentFile=/home/root/rpp-sleep-screen-v2/config.env
+ExecStart=/bin/sh /home/root/rpp-sleep-screen-v2/update.sh
