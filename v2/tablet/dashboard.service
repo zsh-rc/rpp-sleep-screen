@@ -5,5 +5,6 @@ ConditionPathExists=/home/root/rpp-sleep-screen-v2/config.env
 
 [Service]
 Type=oneshot
+Environment="PATH=/home/root/.vellum/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 EnvironmentFile=/home/root/rpp-sleep-screen-v2/config.env
 ExecStart=/bin/sh /home/root/rpp-sleep-screen-v2/update.sh

@@ -25,8 +25,12 @@ flowchart LR
   that no work happens during an awake CPU period with the screen asleep.
 - Wi-Fi association does not prove Internet access. The HTTPS fetch is the
   connectivity check; offline/captive-portal failures leave the old screen alone.
-  Each request has a 5-second connection timeout and 20-second total timeout.
+  Curl requests have a 5-second connection timeout. The manifest has a 20-second
+  total timeout; images have a 300-second total timeout to accommodate slow
+  connections. Set `IMAGE_TIMEOUT` in `config.env` to 1..1800 seconds if needed.
   Failed checks retry on the next timer interval, without a busy retry loop.
+  Longer transfers keep networking active longer, so check battery impact before
+  enabling the timer. Downloads remain size-limited and checksum-verified.
 - GitHub runs at minute 17 every two hours in UTC. Scheduled Actions can be
   delayed or skipped; this is not a real-time weather service. The next image
   includes current weather, today's high/low, seven additional forecast days,
@@ -132,7 +136,7 @@ ssh root@TABLET_IP
 On the tablet, first check the available tools:
 
 ```sh
-for tool in systemctl curl sha256sum od tr awk flock mktemp mount cp mv rm wc date dirname chmod mkdir; do
+for tool in systemctl curl sha256sum dd cmp tr awk flock mktemp mount cp mv rm wc date dirname chmod mkdir; do
     command -v "$tool" || break
 done
 curl --version
@@ -142,7 +146,16 @@ Every tool must be available. `curl` must support HTTPS, certificate validation,
 `--proto`, `--proto-redir` and `--max-filesize`; the tablet must have a valid
 clock and CA certificates. Do not bypass TLS validation. A missing utility
 requires firmware-compatible installation before proceeding, not an assumed
-package manager. These capabilities have **not** been checked on your tablet.
+package manager. On this Paper Pro, curl was installed through reManager and
+HTTPS manifest fetching succeeded. Other devices need their own checks.
+The service explicitly includes `/home/root/.vellum/bin` in its PATH so it
+can find reManager's curl without loading interactive shell profiles. If curl
+works manually but service logs show wget, reinstall the updated service unit
+and run `systemctl daemon-reload`; changing the shell PATH alone will not help.
+If curl is absent, the updater can use certificate-validating BusyBox `wget`
+with OpenSSL and `timeout`; it rejects redirected response chains and warnings
+that certificate validation is unimplemented. Its resource limit bounds the
+download, followed by an exact size check before parsing or installing it.
 
 Create `/home/root/rpp-sleep-screen-v2/config.env` from `config.env.example`,
 set `BASE_URL` to your real HTTPS Pages URL without a trailing slash, then run:
@@ -152,10 +165,21 @@ chmod 600 /home/root/rpp-sleep-screen-v2/config.env
 set -a
 . /home/root/rpp-sleep-screen-v2/config.env
 set +a
+CHECK_ONLY=1 sh /home/root/rpp-sleep-screen-v2/update.sh
 sh /home/root/rpp-sleep-screen-v2/update.sh
 ```
 
-This manual test actually installs the image and backs up the existing screen.
+Check-only mode verifies a changed image without installing it or remounting
+root. The second command actually installs it and backs up the existing screen.
+The script reads exported environment variables, not the file itself; always
+source it using `set -a` for manual runs. The systemd service loads it directly.
+Existing configuration files can omit `IMAGE_TIMEOUT` to use the default 300
+seconds. A temporary override for a slower connection is:
+
+```sh
+IMAGE_TIMEOUT=600 sh /home/root/rpp-sleep-screen-v2/update.sh
+```
+
 Put the tablet to sleep and verify the image. Also verify v1's carousel overlay
 workaround if required by your firmware: v2 does not modify carousel assets.
 The original v1 command for that workaround also uploads a v1 image, so use it
