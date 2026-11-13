@@ -1,8 +1,9 @@
 # Sleep Screen v2
 
 V2 generates images on GitHub and lets the tablet pull them. V1's script, tests,
-example image and configuration are unchanged. Do not run the v1 uploader while
-the v2 timer is enabled: both own the same tablet sleep-screen file.
+and configuration are in `v1/`; both versions share the root `assets/` and
+`photos/` folders. Do not run the v1 uploader while the v2 timer is enabled:
+both own the same tablet sleep-screen file.
 
 ## Architecture and scope
 
@@ -246,15 +247,15 @@ v1's separate restoration command remains available.
 
 ## Local generation and validation
 
-Use the root dependencies and your existing virtual environment. Unlike v1,
-v2 settings come from the process environment:
+Use the dependencies in `v1/requirements.txt` and your existing virtual
+environment. Unlike v1, v2 settings come from the process environment:
 
 ```sh
 export LATITUDE=31.2304 LONGITUDE=121.4737 CITY_NAME=SHANGHAI
 python v2/generate.py
 python v2/generate.py --orientation landscape --output-dir v2/public-landscape
 python -m unittest discover -s v2/tests -v
-python -m unittest discover -s tests -v
+python -m unittest discover -s v1/tests -v
 sh -n v2/tablet/update.sh
 ```
 

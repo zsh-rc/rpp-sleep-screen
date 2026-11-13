@@ -9,6 +9,7 @@ from dotenv import dotenv_values
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ENV_PATH = os.path.join(BASE_DIR, ".env")
 
 
 def load_configuration(path):
@@ -32,12 +33,12 @@ def load_configuration(path):
 
 
 LATITUDE, LONGITUDE, CITY_NAME, SSH_HOST, CONTACT_INFO = load_configuration(
-    os.path.join(BASE_DIR, ".env")
+    ENV_PATH
 )
 # Corporate PAC files are not evaluated by Requests. Set HTTPS_PROXY in your
 # terminal to the explicit HTTP/HTTPS proxy address provided by IT.
 
-PHOTOS_DIR = os.path.join(BASE_DIR, "photos")
+PHOTOS_DIR = os.path.join(BASE_DIR, "..", "photos")
 OUTPUT_PATH = os.path.join(BASE_DIR, "dashboard.png")
 
 WIDTH, HEIGHT = 1620, 2160
