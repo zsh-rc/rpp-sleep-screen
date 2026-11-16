@@ -1,4 +1,5 @@
 import configparser
+import fcntl
 import hashlib
 import os
 import shlex
@@ -56,6 +57,8 @@ elif tool == "mount":
     if os.environ.get("FAIL_MOUNT") == args[1]:
         sys.exit(1)
 elif tool == "flock":
+    if os.environ.get("FAIL_FLOCK"):
+        sys.exit(70)
     try:
         fcntl.flock(int(args[-1]), fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
@@ -230,6 +233,48 @@ class TabletTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("download verified using curl", result.stdout)
         self.assertNotIn("wget ", self.calls())
+
+    def test_status_protocol_reports_updated_current_and_verified(self):
+        result = self.run_updater(REPORT_STATUS="1", CHECK_ONLY="1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("RPP_STATUS=verified\n", result.stdout)
+        result = self.run_updater(REPORT_STATUS="1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("RPP_STATUS=updated\n", result.stdout)
+        result = self.run_updater(REPORT_STATUS="1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("RPP_STATUS=current\n", result.stdout)
+
+    def test_timer_and_app_share_lock_with_distinct_busy_outcomes(self):
+        state = self.root / "state"
+        state.mkdir()
+        with (state / "update.lock").open("w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            result = self.run_updater()
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Another dashboard update", result.stdout)
+            result = self.run_updater(REPORT_STATUS="1")
+            self.assertEqual(result.returncode, 75)
+            self.assertIn("RPP_STATUS=busy\n", result.stdout)
+        self.assertNotIn("curl ", self.calls())
+        self.assertEqual(self.target.read_bytes(), b"original v1 image")
+
+    def test_invalid_status_mode_fails_before_download(self):
+        result = self.run_updater(REPORT_STATUS="yes")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("REPORT_STATUS", result.stderr)
+        self.assertFalse((self.root / "calls").exists())
+
+    def test_lock_error_is_not_reported_as_busy(self):
+        result = self.run_updater(REPORT_STATUS="1", FAIL_FLOCK="1")
+        self.assertEqual(result.returncode, 70)
+        self.assertIn("Could not acquire dashboard update lock", result.stderr)
+        self.assertNotIn("RPP_STATUS=busy", result.stdout)
+
+    def test_restore_failure_is_not_success_even_with_updated_status(self):
+        result = self.run_updater(REPORT_STATUS="1", FAIL_MOUNT="remount,ro")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CRITICAL", result.stderr)
 
 
 if __name__ == "__main__":

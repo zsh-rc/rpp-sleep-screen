@@ -1,0 +1,27 @@
+cmake_minimum_required(VERSION 3.16)
+project(rpp_dashboard VERSION 3.0.0 LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Quick)
+
+add_library(dashboard_backend STATIC dashboard.cpp dashboard.h sleepsettings.cpp sleepsettings.h)
+target_link_libraries(dashboard_backend PUBLIC Qt6::Quick)
+target_compile_options(dashboard_backend PRIVATE -Wall -Wextra -Wpedantic)
+
+add_executable(rpp-dashboard main.cpp qml.qrc)
+target_link_libraries(rpp-dashboard PRIVATE dashboard_backend)
+install(TARGETS rpp-dashboard RUNTIME DESTINATION .)
+install(PROGRAMS tablet/launch.sh DESTINATION .)
+
+option(BUILD_TESTING "Build desktop tests" OFF)
+if(BUILD_TESTING)
+    enable_testing()
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+    add_executable(test-dashboard tests/test_dashboard.cpp qml.qrc)
+    target_link_libraries(test-dashboard PRIVATE dashboard_backend Qt6::Test)
+    add_test(NAME dashboard COMMAND test-dashboard)
+    set_tests_properties(dashboard PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+endif()

@@ -5,6 +5,10 @@ and configuration are in `v1/`; both versions share the root `assets/` and
 `photos/` folders. Do not run the v1 uploader while the v2 timer is enabled:
 both own the same tablet sleep-screen file.
 
+For an Oxide-launched manual download and awake-screen preview, see
+[v3](../v3/README.md). V3 reuses this updater and configuration; the v2 timer
+stays enabled. GitHub generation and publication are unchanged.
+
 ## Architecture and scope
 
 ```mermaid
@@ -60,6 +64,12 @@ hash and downloads only changed images. It rejects unsafe paths, downloads over
 The cloud fully verifies the generated PNG using Pillow; the shell updater
 checks its header and checksum, not a complete PNG decode. HTTPS authenticates
 the endpoint; the checksum is integrity checking, not a cryptographic signature.
+
+Interactive clients can set `REPORT_STATUS=1` for a machine-readable result:
+`RPP_STATUS=updated`, `current`, or `verified` on a successful operation;
+`RPP_STATUS=busy` with exit 75 when another updater holds the shared lock.
+Always check the exit status too: installation can precede a cleanup failure.
+Without this flag, a busy timer check logs the contention and exits 0 as before.
 
 Download and verification happen on writable home storage. The original screen
 is backed up once there. Installation copies into a temporary file beside the
@@ -186,14 +196,45 @@ workaround if required by your firmware: v2 does not modify carousel assets.
 The original v1 command for that workaround also uploads a v1 image, so use it
 before enabling the v2 timer, then run the v2 updater again.
 
-Only after the manual test succeeds, install the dedicated units. Run this
-block on the tablet; it preserves the initial root mount state:
+Only after the manual test succeeds, install the dedicated units. On Paper Pro
+firmware 3.29.1.0, `/etc` has a volatile overlay: units and enablement links
+written there disappear on reboot. The following vendor-unit installation was
+verified to survive a reboot on that firmware. Confirm systemd searches
+`/usr/lib/systemd/system` and that the directory is on persistent storage
+before using it on a different firmware:
+
+```sh
+systemctl show --property=UnitPath
+awk '$5 == "/" || $5 == "/etc" || index($5, "/usr/") == 1 {print}' /proc/self/mountinfo
+```
+
+Do not unmount `/etc`; other mounts, including SSH configuration, may depend
+on it. Run the following block on the tablet. It preserves the initial root
+mount state and refuses to replace an unexpected boot dependency:
 
 ```sh
 (
     set -eu
+    unit_dir=/usr/lib/systemd/system
+    link="$unit_dir/timers.target.wants/rpp-dashboard-v2.timer"
+    systemctl show --property=UnitPath | tr ' ' '\n' | grep -qx "$unit_dir"
+    if [ -e "$link" ] || [ -L "$link" ]; then
+        [ -L "$link" ] && [ "$(readlink "$link")" = ../rpp-dashboard-v2.timer ] || {
+            echo "Unexpected existing timer dependency: $link" >&2
+            exit 1
+        }
+    fi
     restore_ro=0
-    trap 'if [ "$restore_ro" = 1 ]; then mount -o remount,ro /; fi' EXIT
+    cleanup() {
+        result=$?
+        trap - EXIT
+        if [ "$restore_ro" = 1 ] && ! mount -o remount,ro /; then
+            echo "CRITICAL: could not restore root read-only" >&2
+            result=1
+        fi
+        exit "$result"
+    }
+    trap cleanup EXIT
     trap 'exit 1' HUP INT TERM
     root_options=$(awk '$2 == "/" {print $4; exit}' /proc/mounts)
     case ",$root_options," in
@@ -201,15 +242,26 @@ block on the tablet; it preserves the initial root mount state:
         *,rw,*) ;;
         *) echo 'Cannot determine root mount state' >&2; exit 1 ;;
     esac
-    cp /home/root/rpp-sleep-screen-v2/dashboard.service /etc/systemd/system/rpp-dashboard-v2.service
-    cp /home/root/rpp-sleep-screen-v2/dashboard.timer /etc/systemd/system/rpp-dashboard-v2.timer
-    chmod 644 /etc/systemd/system/rpp-dashboard-v2.service /etc/systemd/system/rpp-dashboard-v2.timer
+    cp /home/root/rpp-sleep-screen-v2/dashboard.service "$unit_dir/rpp-dashboard-v2.service"
+    cp /home/root/rpp-sleep-screen-v2/dashboard.timer "$unit_dir/rpp-dashboard-v2.timer"
+    chmod 644 "$unit_dir/rpp-dashboard-v2.service" "$unit_dir/rpp-dashboard-v2.timer"
+    mkdir -p "$unit_dir/timers.target.wants"
+    if [ ! -L "$link" ]; then ln -s ../rpp-dashboard-v2.timer "$link"; fi
     systemctl daemon-reload
-    systemctl enable --now rpp-dashboard-v2.timer
+    systemctl start rpp-dashboard-v2.timer
 )
+systemctl show rpp-dashboard-v2.timer --property=FragmentPath
 systemctl list-timers rpp-dashboard-v2.timer
 journalctl -u rpp-dashboard-v2.service -n 30 --no-pager
 ```
+
+Check that `FragmentPath` is `/usr/lib/systemd/system/rpp-dashboard-v2.timer`;
+an overriding unit in `/etc` or `/run` may take precedence. Do not rely solely
+on the `enabled`/`disabled` label from `systemctl status`: the vendor-directory
+dependency may start the timer even when the label says `disabled`. Confirm
+that the timer starts and runs the service after reboot. Do not use
+`systemctl enable` as a substitute for the persistent dependency on this
+firmware, since its link may be written under volatile `/etc`.
 
 Wake the tablet with Wi-Fi disconnected, then reconnect and allow a few minutes
 of awake time. Verify the log and next sleep screen. Check suspend/resume,
@@ -225,14 +277,50 @@ Stop both units first so a running update cannot race with v1:
 systemctl stop rpp-dashboard-v2.timer rpp-dashboard-v2.service
 ```
 
-To disable it persistently, temporarily remount root writable if it was
-read-only, run `systemctl disable rpp-dashboard-v2.timer`, then restore its
-original mount state. Use the guarded remount block above, replacing its copy,
-reload and enable commands with that disable command. Leave the home backup
-in place. V1 can then generate/upload normally without any v2 configuration.
+For the vendor-directory installation above, remove its boot dependency while
+preserving the initial root mount state:
+
+```sh
+(
+    set -eu
+    link=/usr/lib/systemd/system/timers.target.wants/rpp-dashboard-v2.timer
+    if [ -e "$link" ] || [ -L "$link" ]; then
+        [ -L "$link" ] && [ "$(readlink "$link")" = ../rpp-dashboard-v2.timer ] || {
+            echo "Unexpected timer dependency: $link" >&2; exit 1
+        }
+    else
+        echo "Timer dependency not found: $link" >&2; exit 1
+    fi
+    restore_ro=0
+    cleanup() {
+        result=$?
+        trap - EXIT
+        if [ "$restore_ro" = 1 ] && ! mount -o remount,ro /; then
+            echo "CRITICAL: could not restore root read-only" >&2
+            result=1
+        fi
+        exit "$result"
+    }
+    trap cleanup EXIT
+    trap 'exit 1' HUP INT TERM
+    root_options=$(awk '$2 == "/" {print $4; exit}' /proc/mounts)
+    case ",$root_options," in
+        *,ro,*) mount -o remount,rw /; restore_ro=1 ;;
+        *,rw,*) ;;
+        *) echo 'Cannot determine root mount state' >&2; exit 1 ;;
+    esac
+    rm "$link"
+    systemctl daemon-reload
+)
+```
+
+If installed by a different method, check for and remove that method's
+enablement links too; `systemctl disable` alone does not remove the vendor
+dependency above. After reboot, verify the timer is inactive before returning
+to v1. Leave the home backup in place.
 
 To restore the pre-v2 image instead, while the units are stopped, use that same
-guarded remount block with these commands in place of unit installation:
+guarded remount pattern above with these commands in place of link removal:
 
 ```sh
 cp /home/root/rpp-sleep-screen-v2/state/original-suspended.png /usr/share/remarkable/.dashboard-restore.new

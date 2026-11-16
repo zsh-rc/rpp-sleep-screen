@@ -1,0 +1,12 @@
+{
+  "displayName": "Dashboard",
+  "description": "Download and preview the latest GitHub Pages sleep image",
+  "bin": "/home/root/rpp-dashboard-v3/launch.sh",
+  "type": "foreground",
+  "workingDirectory": "/home/root/rpp-dashboard-v3",
+  "flags": ["nopreload"],
+  "environment": {
+    "QT_QPA_PLATFORM": "oxide",
+    "QT_QUICK_BACKEND": "software"
+  }
+}

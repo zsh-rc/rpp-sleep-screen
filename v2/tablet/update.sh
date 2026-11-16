@@ -12,6 +12,7 @@ STATE_DIR=${STATE_DIR:-/home/root/rpp-sleep-screen-v2/state}
 TARGET_PATH=${TARGET_PATH:-/usr/share/remarkable/suspended.png}
 IMAGE_TIMEOUT=${IMAGE_TIMEOUT:-300}
 CHECK_ONLY=${CHECK_ONLY:-0}
+REPORT_STATUS=${REPORT_STATUS:-0}
 case "$IMAGE_TIMEOUT" in
     ''|*[!0-9]*) echo "IMAGE_TIMEOUT must be 1..1800 seconds" >&2; exit 1 ;;
 esac
@@ -22,6 +23,16 @@ case "$CHECK_ONLY" in
     0|1) ;;
     *) echo "CHECK_ONLY must be 0 or 1" >&2; exit 1 ;;
 esac
+case "$REPORT_STATUS" in
+    0|1) ;;
+    *) echo "REPORT_STATUS must be 0 or 1" >&2; exit 1 ;;
+esac
+
+report_status() {
+    if [ "$REPORT_STATUS" = 1 ]; then
+        echo "RPP_STATUS=$1"
+    fi
+}
 
 DOWNLOADER=${DOWNLOADER:-auto}
 if [ "$DOWNLOADER" = auto ]; then
@@ -37,7 +48,18 @@ for tool in $download_tools sha256sum dd cmp tr awk flock mktemp mount cp mv rm 
 done
 mkdir -p "$STATE_DIR"
 exec 9>"$STATE_DIR/update.lock"
-flock -n 9 || exit 0
+if flock -n 9; then
+    :
+else
+    lock_result=$?
+    if [ "$lock_result" != 1 ]; then
+        echo "Could not acquire dashboard update lock (exit $lock_result)" >&2
+        exit "$lock_result"
+    fi
+    echo "Another dashboard update is running"
+    report_status busy
+    if [ "$REPORT_STATUS" = 1 ]; then exit 75; else exit 0; fi
+fi
 work=$(mktemp -d "$STATE_DIR/download.XXXXXX")
 target_temp="$(dirname "$TARGET_PATH")/.dashboard-v2.new"
 restore_ro=0
@@ -102,6 +124,7 @@ if [ -f "$TARGET_PATH" ]; then
     installed=$(sha256sum "$TARGET_PATH")
     if [ "${installed%% *}" = "$expected" ]; then
         echo "Dashboard already current"
+        report_status current
         exit 0
     fi
 fi
@@ -116,6 +139,7 @@ cmp -s "$work/header.actual" "$work/header.expected" || {
 }
 if [ "$CHECK_ONLY" = 1 ]; then
     echo "Dashboard download verified using $DOWNLOADER; sleep screen unchanged"
+    report_status verified
     exit 0
 fi
 if [ ! -f "$STATE_DIR/original-suspended.png" ] && [ -f "$TARGET_PATH" ]; then
@@ -134,3 +158,4 @@ chmod 644 "$target_temp"
 mv -f "$target_temp" "$TARGET_PATH"
 target_pending=0
 echo "Sleep screen updated; it will be used on the next sleep if firmware reloads the asset"
+report_status updated

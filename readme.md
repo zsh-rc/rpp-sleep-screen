@@ -2,12 +2,12 @@
 
 ## Overview
 
-A weather dashboard for the reMarkable Paper Pro sleep screen allows you to quickly glance at current weather conditions and forecasts without unlocking your tablet. This project provides two approaches to achieve this functionality.
+A weather dashboard for the reMarkable Paper Pro sleep screen allows you to quickly glance at current weather conditions and forecasts without unlocking your tablet.
 
 ![Screenshot of the weather dashboard on the reMarkable Paper Pro sleep screen](./assets/example.png)
 
-This project provides two ways to generate and deliver a weather dashboard for
-the reMarkable Paper Pro sleep screen:
+This project provides two generation/delivery approaches and an optional
+on-device application for manual downloading and awake-screen preview:
 
 ## Version 1 - Local Upload
 
@@ -37,6 +37,13 @@ flowchart LR
     Pages -->|HTTPS: manifest and image| Timer[Tablet updater timer]
     Timer --> Screen[Sleep screen]
 ```
+
+## Version 3 - Oxide Application
+
+**[V3](./v3/README.md)** builds on v2: open Dashboard from Oxide, tap Refresh
+to download the latest GitHub Pages image immediately, and preview it while
+awake. The same image is used for sleep. V2's GitHub Actions and tablet timer
+remain in place; Refresh does not trigger generation.
 
 ## Summary
 
