@@ -1,0 +1,8 @@
+{
+  "id": "rpp-dashboard-v3",
+  "name": "Dashboard",
+  "loadsBackend": true,
+  "entry": "/ui/Dashboard.qml",
+  "supportsScaling": true,
+  "canHaveMultipleFrontends": false
+}

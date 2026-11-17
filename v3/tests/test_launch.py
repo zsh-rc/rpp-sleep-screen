@@ -63,6 +63,18 @@ class LaunchTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Missing updater", result.stderr)
 
+    def test_selects_appload_backend_without_changing_shared_configuration(self):
+        backend = self.root / "backend"
+        backend.write_text('#!/bin/sh\nprintf "%s\\n" "$BASE_URL" "$1"\n')
+        backend.chmod(0o755)
+        result = subprocess.run(
+            ["/bin/sh", str(self.root / "launch.sh"), "/tmp/appload.sock"],
+            env={**os.environ, "CONFIG_PATH": str(self.config), "APP_EXECUTABLE": str(backend)},
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["https://example.test", "/tmp/appload.sock"])
+
     def test_registration_uses_oxide_compositor_and_no_preload(self):
         registration = json.loads((TABLET / "dashboard.oxide").read_text())
         self.assertEqual(registration["bin"], "/home/root/rpp-dashboard-v3/launch.sh")
@@ -70,6 +82,16 @@ class LaunchTests(unittest.TestCase):
         self.assertEqual(registration["environment"]["QT_QPA_PLATFORM"], "oxide")
         self.assertEqual(registration["environment"]["QT_QUICK_BACKEND"], "software")
         self.assertIn("nopreload", registration["flags"])
+
+    def test_appload_registration_and_resource_paths(self):
+        app = TABLET.parent / "appload"
+        registration = json.loads((app / "manifest.json").read_text())
+        self.assertEqual(registration["id"], "rpp-dashboard-v3")
+        self.assertTrue(registration["loadsBackend"])
+        self.assertFalse(registration["canHaveMultipleFrontends"])
+        self.assertEqual(registration["entry"], "/ui/Dashboard.qml")
+        self.assertTrue((app / registration["entry"].lstrip("/")).is_file())
+        self.assertIn("rpp-dashboard-v3", (app / "ui" / "Dashboard.qml").read_text())
 
 
 if __name__ == "__main__":

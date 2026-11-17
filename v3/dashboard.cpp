@@ -138,7 +138,7 @@ void Dashboard::refresh() {
     auto environment = QProcessEnvironment::systemEnvironment();
     environment.insert("REPORT_STATUS", "1");
     environment.insert("CHECK_ONLY", "0");
-    // Download tools do not need Oxide's GUI preload libraries.
+    // Download tools do not need launcher preload libraries.
     environment.remove("LD_PRELOAD");
     m_process.setProcessEnvironment(environment);
     m_output.clear();

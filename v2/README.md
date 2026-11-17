@@ -269,6 +269,29 @@ reboot persistence and battery impact on your actual firmware before relying
 on this service. Immediate wake/network callbacks can be a later, separately
 validated enhancement; no unsupported firmware hook is installed here.
 
+## Root remount failure
+
+On one Paper Pro running firmware 3.29.1.0, an image was installed but the
+attempt to remount root read-only failed with `mount point is busy`. The updater
+reported an error and root remained writable. The cause is not yet known. A
+subsequent unchanged-image check can succeed without restoring root, so a
+successful timer status alone does not establish that root is read-only.
+
+If logs report `CRITICAL: could not restore root filesystem read-only`, stop
+automatic updates, save and sync work, and check the actual mount state:
+
+```sh
+systemctl stop rpp-dashboard-v2.timer
+systemctl status rpp-dashboard-v2.service --no-pager
+awk '$2 == "/" {print $4}' /proc/mounts
+```
+
+Wait for any active update to finish before rebooting normally. On the observed
+device a normal reboot restored root to read-only; verify the mount state again
+afterward. The timer may start automatically at boot, so stop it again if you
+intend to keep updates paused. Investigate the cause before relying on future
+automatic installations; do not assume reboot resolves the underlying issue.
+
 ## Stop and return to v1
 
 Stop both units first so a running update cannot race with v1:

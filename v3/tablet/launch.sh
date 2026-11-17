@@ -15,4 +15,4 @@ export UPDATER_PATH=${UPDATER_PATH:-/home/root/rpp-sleep-screen-v2/update.sh}
 [ -f "$UPDATER_PATH" ] || { echo "Missing updater: $UPDATER_PATH" >&2; exit 1; }
 
 app_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-exec "$app_dir/rpp-dashboard" "$@"
+exec "${APP_EXECUTABLE:-$app_dir/rpp-dashboard}" "$@"

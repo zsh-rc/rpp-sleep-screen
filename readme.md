@@ -38,12 +38,14 @@ flowchart LR
     Timer --> Screen[Sleep screen]
 ```
 
-## Version 3 - Oxide Application
+## Version 3 - Manual Refresh Application
 
-**[V3](./v3/README.md)** builds on v2: open Dashboard from Oxide, tap Refresh
-to download the latest GitHub Pages image immediately, and preview it while
-awake. The same image is used for sleep. V2's GitHub Actions and tablet timer
-remain in place; Refresh does not trigger generation.
+**[V3](./v3/README.md)** adds manual refresh and awake-screen preview to v2.
+The [AppLoad frontend](./v3/APPLOAD.md) has had initial testing on a Paper Pro;
+the separate Oxide frontend remains untested on the device. Refresh downloads
+the latest published image, not a newly generated one. The v2 GitHub Actions
+and tablet timer remain in place. Review the documented AppLoad crash and
+root-filesystem remount risks before use.
 
 ## Summary
 

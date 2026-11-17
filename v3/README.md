@@ -1,7 +1,12 @@
-# Dashboard v3 - Oxide manual refresh and preview
+# Dashboard v3 - manual refresh and preview
 
-V3 is a native Qt Quick application for reMarkable Paper Pro, launched from
-**Oxide 3.x**. It adds manual downloading and an awake-screen preview to v2.
+**AppLoad integration:** For the XOVI/AppLoad frontend, its initial device test
+results, known risks, and installation steps, use [APPLOAD.md](./APPLOAD.md).
+The instructions below describe the separate, optional Oxide frontend, which
+has not been tested on the device; do not install Oxide just to use AppLoad.
+
+The Oxide frontend is a native Qt Quick application for reMarkable Paper Pro,
+launched from **Oxide 3.x**. It adds manual downloading and an awake-screen preview to v2.
 GitHub Actions still generates the images, GitHub Pages still publishes them,
 and the v2 timer stays enabled. No GitHub token or image renderer runs in v3.
 
@@ -59,6 +64,8 @@ The app sets `REPORT_STATUS=1` and `CHECK_ONLY=0` for its child process:
 
 The app checks **both** exit status and the protocol, so a failed read-only
 remount cannot appear successful even if an image was already installed.
+Such a failure was observed on a Paper Pro and can leave root writable; see
+the [v2 recovery guidance](../v2/README.md#root-remount-failure).
 The timer's default busy behavior remains exit 0, now with an explicit log.
 If the timer is busy, the app asks you to retry instead of waiting indefinitely
 or starting a competing writer.

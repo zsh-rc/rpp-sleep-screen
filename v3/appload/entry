@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+APP_EXECUTABLE=/home/root/rpp-dashboard-v3/dashboard-appload
+export APP_EXECUTABLE
+exec /home/root/rpp-dashboard-v3/launch.sh "$@"
